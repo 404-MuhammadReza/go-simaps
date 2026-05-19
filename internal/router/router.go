@@ -94,6 +94,7 @@ func Setup(handler Handler, cfg *config.Config) *gin.Engine {
 				{
 					log.GET("", handler.Logging.GetUsageRecap)
 					log.GET("/details", handler.Logging.GetFeatureDetails)
+					log.GET("/export", handler.Logging.ExportDetails)
 				}
 			}
 		}
