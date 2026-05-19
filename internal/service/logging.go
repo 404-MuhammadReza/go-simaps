@@ -2,8 +2,10 @@ package service
 
 import (
 	"time"
+	"bytes"
 	"context"
-	
+
+	"go-simaps/internal/utils"
 	"go-simaps/internal/model"
 	"go-simaps/internal/apperror"
 	"go-simaps/internal/repository"
@@ -13,6 +15,7 @@ type LoggingService interface {
 	LogUsage(ctx context.Context, userID string, request model.LogRequest) error
 	GetSummary(ctx context.Context) ([]model.Summary, error)
 	GetDetails(ctx context.Context, query model.DetailRequest) ([]model.UsageLog, error)
+	ExportDetails(ctx context.Context, query model.DetailRequest) (*bytes.Buffer, error)
 }
 
 type loggingService struct {
@@ -47,15 +50,44 @@ func (s *loggingService) GetSummary(ctx context.Context) ([]model.Summary, error
 }
 
 func (s *loggingService) GetDetails(ctx context.Context, query model.DetailRequest) ([]model.UsageLog, error) {
-	layout := "2006-01-02"
-	start, err := time.Parse(layout, query.StartDate)
-	if err != nil { return nil, apperror.ErrBadRequest("invalid start_date format, use YYYY-MM-DD") }
-
-	end, err := time.Parse(layout, query.EndDate)
-	if err != nil { return nil, apperror.ErrBadRequest("invalid end_date format, use YYYY-MM-DD") }
-
-	end = time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 999999999, end.Location())
-	if start.After(end) { return nil, apperror.ErrBadRequest("start_date cannot be after end_date") }
+	start, end, err := parseDetailRange(query)
+	if err != nil { return nil, err }
 
 	return s.repository.GetDetails(ctx, query.Feature, start, end)
+}
+
+func (s *loggingService) ExportDetails(ctx context.Context, query model.DetailRequest) (*bytes.Buffer, error) {
+	start, end, err := parseDetailRange(query)
+	if err != nil { return nil, err }
+
+	logs, err := s.repository.GetDetails(ctx, query.Feature, start, end)
+	if err != nil { return nil, apperror.ErrInternal("Failed to retrieve usage details") }
+
+	data := make([][]interface{}, 0, len(logs))
+	for _, log := range logs {
+		data = append(data, []interface{}{
+			log.Timestamp.Format("2006-01-02 15:04:05"),
+			*log.UserName, log.Feature, log.Action,
+		})
+	}
+
+	columns := utils.LogDetailColumns
+	excel, err := utils.GenerateExport(columns, data)
+	if err != nil { return nil, apperror.ErrInternal("Failed to generate Excel") }
+
+	return excel, nil
+}
+
+func parseDetailRange(query model.DetailRequest) (time.Time, time.Time, error) {
+	layout := "2006-01-02"
+	start, err := time.Parse(layout, query.StartDate)
+	if err != nil { return time.Time{}, time.Time{}, apperror.ErrBadRequest("invalid start_date format, use YYYY-MM-DD") }
+
+	end, err := time.Parse(layout, query.EndDate)
+	if err != nil { return time.Time{}, time.Time{}, apperror.ErrBadRequest("invalid end_date format, use YYYY-MM-DD") }
+
+	end = time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 999999999, end.Location())
+	if start.After(end) { return time.Time{}, time.Time{}, apperror.ErrBadRequest("start_date cannot be after end_date") }
+
+	return start, end, nil
 }

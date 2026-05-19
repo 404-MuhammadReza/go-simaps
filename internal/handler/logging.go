@@ -43,7 +43,7 @@ func (h *LoggingHandler) GetUsageRecap(c *gin.Context) {
 	c.JSON(200, Response{
 		Success: true,
 		Message: "Usage recap retrieved successfully",
-		Data: recaps,
+		Data:    recaps,
 	})
 }
 
@@ -55,11 +55,25 @@ func (h *LoggingHandler) GetFeatureDetails(c *gin.Context) {
 
 	ctx := context.Background()
 	logs, err := h.service.GetDetails(ctx, query)
-	if err != nil { c.Error(err);  return }
+	if err != nil { c.Error(err); return }
 
 	c.JSON(200, Response{
 		Success: true,
 		Message: "Feature details retrieved successfully",
-		Data: logs,
+		Data:    logs,
 	})
+}
+
+func (h *LoggingHandler) ExportDetails(c *gin.Context) {
+	var query model.DetailRequest
+
+	err := c.ShouldBindQuery(&query)
+	if err != nil { c.Error(apperror.ErrValidation(err)); return }
+
+	ctx := context.Background()
+	file, err := h.service.ExportDetails(ctx, query)
+	if err != nil { c.Error(err); return }
+
+	c.Header("Content-Disposition", "attachment; filename=usage_logs_details.xlsx")
+	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file.Bytes())
 }
