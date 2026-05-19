@@ -68,8 +68,14 @@ var (
 		{Header: "Status", Width: 15, Align: "center"},
 		{Header: "Description", Width: 50, Align: "left"},
 	}
-)
 
+	LogDetailColumns = []Column{
+		{Header: "Timestamp", Width: 22, Align: "center"},
+		{Header: "User Name", Width: 30, Align: "left"},
+		{Header: "Feature", Width: 30, Align: "left"},
+		{Header: "Action", Width: 100, Align: "left"},
+	}
+)
 var (
 	border = []excelize.Border{
 		{Type: "left", Color: "000000", Style: 1},
